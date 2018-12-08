@@ -1,0 +1,23 @@
+
+set(SOURCES
+	${SOURCES_PREFIX}/core_dev.c
+	${SOURCES_PREFIX}/hal_set_alternate_pin_function.c
+	${SOURCES_PREFIX}/core_sleep.c
+	${SOURCES_PREFIX}/core_initclock.c
+	${SOURCES_PREFIX}/core_startup.c
+	${SOURCES_PREFIX}/fault_dev.c
+	${SOURCES_PREFIX}/i2c_dev.c
+	${SOURCES_PREFIX}/mcu_dev.c
+	${SOURCES_PREFIX}/mpu_dev.c
+	${SOURCES_PREFIX}/pio_dev.c
+	${SOURCES_PREFIX}/spi_local.c
+	${SOURCES_PREFIX}/spi_local.h
+	${SOURCES_PREFIX}/spi_dev.c
+	${SOURCES_PREFIX}/tmr_dev.c
+	${SOURCES_PREFIX}/uart_dev.c
+	${SOURCES_PREFIX}/wdt.c
+	${SOURCES_PREFIX}/imxrt_local.h
+	${SOURCES_PREFIX}/imxrt_pin_local.h
+	${SOURCES_PREFIX}/imxrt_flash.c
+	${SOURCES_PREFIX}/imxrt_flash.h
+	PARENT_SCOPE)
