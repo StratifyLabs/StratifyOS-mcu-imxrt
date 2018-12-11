@@ -24,7 +24,7 @@
 #include "mcu/pio.h"
 #include "mcu/debug.h"
 #include "mcu/core.h"
-
+#include "fsl_lpuart.h"
 
 
 #define UART_DMA_START_CHAN 0
@@ -44,19 +44,47 @@ typedef struct {
 	u8 ref_count;
 	const uart_attr_t * attr;
 	u8 o_flags;
+	lpuart_transfer_t incoming;
+	u8 _incoming_data;
 } uart_local_t;
 
 static uart_local_t m_uart_local[UART_PORTS] MCU_SYS_MEM;
 LPUART_Type * const uart_regs_table[UART_PORTS] = MCU_UART_REGS;
 u8 const uart_irqs[UART_PORTS] = MCU_UART_IRQS;
 
+static void exec_readcallback(uart_local_t * uart, u32 o_events);
+static void exec_writecallback(uart_local_t * uart, u32 o_events);
+
 DEVFS_MCU_DRIVER_IOCTL_FUNCTION(uart, UART_VERSION, UART_IOC_IDENT_CHAR, I_MCU_TOTAL + I_UART_TOTAL, mcu_uart_get, mcu_uart_put, mcu_uart_flush)
 
+static void lpuart_xfer_callback(LPUART_Type *instance, lpuart_handle_t *handle, status_t status, void *userData){
+	uart_local_t *uart = userData;
+
+	if (kStatus_LPUART_TxIdle == status)
+	{
+		devfs_execute_write_handler(&uart->transfer_handler, NULL, 0, MCU_EVENT_FLAG_WRITE_COMPLETE);
+	}
+
+	if (kStatus_LPUART_RxIdle == status)
+	{
+		if( uart->o_flags & UART_LOCAL_FLAG_IS_INCOMING_ENABLED ){
+			uart->o_flags |= UART_LOCAL_FLAG_IS_INCOMING_AVAILABLE;
+			LPUART_TransferReceiveNonBlocking(uart->instance, &uart->hal_handle, &uart->incoming, NULL);
+		}
+
+		devfs_execute_read_handler(&uart->transfer_handler, NULL, uart->incoming.dataSize, MCU_EVENT_FLAG_DATA_READY);
+	}
+}
+
 int mcu_uart_open(const devfs_handle_t * handle){
-	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
 	if ( local->ref_count == 0 ){
 		local->instance = uart_regs_table[port];
-		//reset HAL UART
+		local->incoming.data = &local->_incoming_data;
+		local->incoming.dataSize = 1;
+
+		LPUART_TransferCreateHandle(local->instance, &(local->hal_handle), lpuart_xfer_callback, &local);
+
 		cortexm_enable_irq(uart_irqs[port]);
 
 	}
@@ -66,12 +94,14 @@ int mcu_uart_open(const devfs_handle_t * handle){
 }
 
 int mcu_uart_close(const devfs_handle_t * handle){
-	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
 
 	if ( local->ref_count > 0 ){
 		if ( local->ref_count == 1 ){
 			cortexm_disable_irq(uart_irqs[port]);
-			local->instance = 0;
+
+			LPUART_Deinit(local->instance);
+			local->instance = NULL;
 		}
 		local->ref_count--;
 	}
@@ -83,7 +113,7 @@ int mcu_uart_dev_is_powered(const devfs_handle_t * handle){
 }
 
 int mcu_uart_getinfo(const devfs_handle_t * handle, void * ctl){
-	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
 
 	uart_info_t * info = ctl;
 
@@ -97,7 +127,7 @@ int mcu_uart_getinfo(const devfs_handle_t * handle, void * ctl){
 }
 
 int mcu_uart_setattr(const devfs_handle_t * handle, void * ctl){
-	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
 	u32 o_flags;
 	u32 freq;
 
@@ -116,18 +146,28 @@ int mcu_uart_setattr(const devfs_handle_t * handle, void * ctl){
 			freq = 115200;
 		}
 
+		LPUART_GetDefaultConfig(&uart_config);
 
-		if( local->attr->width == 9 ){
+		uart_config.baudRate_Bps = freq;
+
+		if( local->attr->width == 7 ){
+			uart_config.dataBitsCount = kLPUART_SevenDataBits;
 		}
 
 		if( o_flags & UART_FLAG_IS_STOP2 ){
+			uart_config.stopBitCount = kLPUART_TwoStopBit;
 		}
 
+		uart_config.parityMode = kLPUART_ParityDisabled;
 		if( o_flags & UART_FLAG_IS_PARITY_EVEN ){
-
+			uart_config.parityMode = kLPUART_ParityEven;
 		} else if( o_flags & UART_FLAG_IS_PARITY_ODD ){
-
+			uart_config.parityMode = kLPUART_ParityOdd;
 		}
+
+		//FIXME: necessary to enable here? Or is it done upon *NonBlocking()?
+		uart_config.enableTx = true;
+		uart_config.enableRx = true;
 
 		//pin assignments
 		if( mcu_set_pin_assignment(
@@ -138,27 +178,89 @@ int mcu_uart_setattr(const devfs_handle_t * handle, void * ctl){
 			return SYSFS_SET_RETURN(EINVAL);
 		}
 
-		LPUART_Init(local->instance, &uart_config, 0);
-
+		if( LPUART_Init(local->instance, &uart_config, BOARD_DebugConsoleSrcFreq()) != kStatus_Success ) {
+			return SYSFS_SET_RETURN(EIO);
+		}
 	}
 
 	return 0;
 }
 
+static void exec_readcallback(uart_local_t * uart, u32 o_events){
+	devfs_execute_read_handler(&(uart->transfer_handler), NULL, uart->incoming.dataSize, o_events);
+
+	//if the callback is NULL now, disable the interrupt
+	if( uart->transfer_handler.read == NULL ){
+
+	}
+}
+
+static void exec_writecallback(uart_local_t * uart, u32 o_events){
+	devfs_execute_write_handler(&(uart->transfer_handler), NULL, 0, o_events);
+
+	//if the callback is NULL now, disable the interrupt
+	if( uart->transfer_handler.write == NULL ){
+
+	}
+}
+
 int mcu_uart_setaction(const devfs_handle_t * handle, void * ctl){
-	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
 	mcu_action_t * action = (mcu_action_t*)ctl;
 
-	//if action->handler.callback == 0 then cancel ongoing operations
+	if( action->handler.callback == 0 ){
+		//if there is an ongoing operation -- cancel it
+
+		if( action->o_events & MCU_EVENT_FLAG_DATA_READY ){
+			//execute the read callback if not null
+			if( local->o_flags & UART_LOCAL_FLAG_IS_INCOMING_ENABLED ){
+				local->o_flags &= ~UART_LOCAL_FLAG_IS_INCOMING_ENABLED;
+				LPUART_TransferAbortReceive(local->instance, &local->hal_handle);
+			}
+
+			exec_readcallback(local, MCU_EVENT_FLAG_CANCELED);
+			local->transfer_handler.read = NULL;
+		}
+
+		if( action->o_events & MCU_EVENT_FLAG_WRITE_COMPLETE ){
+			LPUART_TransferAbortSend(local->instance, &local->hal_handle);
+			exec_writecallback(local, MCU_EVENT_FLAG_CANCELED);
+			local->transfer_handler.write = NULL;
+		}
+
+	} else {
+
+		if( cortexm_validate_callback(action->handler.callback) < 0 ){
+			return SYSFS_SET_RETURN(EPERM);
+		}
+
+		if( action->o_events & MCU_EVENT_FLAG_DATA_READY ){
+			local->transfer_handler.read->handler = action->handler;
+
+			//enable the receiver so that the action is called when a byte arrives
+			local->o_flags |= UART_LOCAL_FLAG_IS_INCOMING_ENABLED;
+			local->o_flags &= ~UART_LOCAL_FLAG_IS_INCOMING_AVAILABLE;
+			if( LPUART_TransferReceiveNonBlocking(local->instance, &local->hal_handle, &local->incoming, NULL) != kStatus_Success ){
+				return SYSFS_SET_RETURN(EIO);
+			}
+		}
+
+		if ( action->o_events & MCU_EVENT_FLAG_WRITE_COMPLETE ){
+			local->transfer_handler.write->handler = action->handler;
+		}
+	}
 
 	cortexm_set_irq_priority(uart_irqs[port], action->prio, action->o_events);
 	return 0;
 }
 
 int mcu_uart_put(const devfs_handle_t * handle, void * ctl){
-	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
 	u8 c = (u32)ctl;
-	LPUART_WriteByte(local->instance, c);
+
+	/* wait until there's room to write the data, since this call path has no async callback to use */
+	LPUART_WriteBlocking(local->instance, &c, 1);
+
 	return 0;
 }
 
@@ -170,11 +272,14 @@ int mcu_uart_flush(const devfs_handle_t * handle, void * ctl){
 
 
 int mcu_uart_get(const devfs_handle_t * handle, void * ctl){
-	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
 	u8 * dest = ctl;
 	if( dest == 0 ){ return SYSFS_SET_RETURN(EINVAL); }
 
-	*dest = LPUART_ReadByte(local->instance);
+	/* wait until there's data, since this call path has no async callback to use */
+	if( LPUART_ReadBlocking(local->instance, dest, 1) == kStatus_Success ){
+		return 0;
+	}
 
 	return SYSFS_SET_RETURN(ENODATA);
 }
@@ -184,12 +289,40 @@ int mcu_uart_getall(const devfs_handle_t * handle, void * ctl){
 }
 
 int mcu_uart_read(const devfs_handle_t * handle, devfs_async_t * async){
-	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
 
 	DEVFS_DRIVER_IS_BUSY(local->transfer_handler.read, async);
 
+	size_t read_cnt = async->nbyte;
 
-	//if failure set local->transfer_handler.write = 0 and return SYSFS_SET_RETURN(<error number>)
+	if ( async->flags & O_NONBLOCK ) {
+		// make sure there's data before making a potentially blocking call
+		uint32_t count;
+		status_t ret = LPUART_TransferGetReceiveCount(local->instance, &local->hal_handle, &count);
+		if (ret == kStatus_Success && count > 0) {
+			read_cnt = MIN(read_cnt, count);
+		} else if (ret == kStatus_NoTransferInProgress) {
+			// validate and register callback if we can't block
+			if( cortexm_validate_callback(async->handler.callback) < 0 ){
+				return SYSFS_SET_RETURN(EPERM);
+			}
+
+			local->transfer_handler.read->handler = async->handler;
+			lpuart_transfer_t myxfer;
+			myxfer.data = async->buf;
+			myxfer.dataSize = async->nbyte;
+			if( LPUART_TransferReceiveNonBlocking(local->instance, &local->hal_handle, &myxfer, NULL) != kStatus_Success ){
+				local->transfer_handler.read = 0;
+				return SYSFS_SET_RETURN(EIO);
+			}
+
+			return 0;
+		}
+	}
+
+	if( LPUART_ReadBlocking(local->instance, async->buf, read_cnt) != kStatus_Success ){
+		return SYSFS_SET_RETURN(ENODATA);
+	}
 
 	//success
 	return 0;
@@ -197,16 +330,20 @@ int mcu_uart_read(const devfs_handle_t * handle, devfs_async_t * async){
 
 
 int mcu_uart_write(const devfs_handle_t * handle, devfs_async_t * async){
-	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
 
 	DEVFS_DRIVER_IS_BUSY(local->transfer_handler.write, async);
 
-	//LPUART_TransferSendNonBlocking()
+	local->transfer_handler.write->handler = async->handler;
+	lpuart_transfer_t myxfer;
+	myxfer.data = async->buf;
+	myxfer.dataSize = async->nbyte;
+	status_t ret = LPUART_TransferSendNonBlocking(local->instance, &local->hal_handle, &myxfer);
+	if( ret == kStatus_Success ){
+		return 0;
+	}
 
-	//if failure set local->transfer_handler.write = 0 and return SYSFS_SET_RETURN(<error number>)
-
-	//success
-	return 0;
+	return SYSFS_SET_RETURN(EIO);
 }
 
 
