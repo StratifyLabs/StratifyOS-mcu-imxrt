@@ -24,7 +24,6 @@
 #include "mcu/pio.h"
 #include "mcu/debug.h"
 #include "mcu/core.h"
-#include "fsl_lpuart.h"
 
 
 #define UART_DMA_START_CHAN 0
@@ -77,7 +76,7 @@ static void lpuart_xfer_callback(LPUART_Type *instance, lpuart_handle_t *handle,
 }
 
 int mcu_uart_open(const devfs_handle_t * handle){
-	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 	if ( local->ref_count == 0 ){
 		local->instance = uart_regs_table[port];
 		local->incoming.data = &local->_incoming_data;
@@ -94,7 +93,7 @@ int mcu_uart_open(const devfs_handle_t * handle){
 }
 
 int mcu_uart_close(const devfs_handle_t * handle){
-	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 
 	if ( local->ref_count > 0 ){
 		if ( local->ref_count == 1 ){
@@ -113,7 +112,7 @@ int mcu_uart_dev_is_powered(const devfs_handle_t * handle){
 }
 
 int mcu_uart_getinfo(const devfs_handle_t * handle, void * ctl){
-	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
+	//DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 
 	uart_info_t * info = ctl;
 
@@ -126,8 +125,27 @@ int mcu_uart_getinfo(const devfs_handle_t * handle, void * ctl){
 	return 0;
 }
 
+/* Get debug console frequency. Copied from NXP SDK interrupt_transfer example. */
+static uint32_t BOARD_DebugConsoleSrcFreq(void)
+{
+    uint32_t freq;
+
+    /* To make it simple, we assume default PLL and divider settings, and the only variable
+       from application is use PLL3 source or OSC source */
+    if (CLOCK_GetMux(kCLOCK_UartMux) == 0) /* PLL3 div6 80M */
+    {
+        freq = (CLOCK_GetPllFreq(kCLOCK_PllUsb1) / 6U) / (CLOCK_GetDiv(kCLOCK_UartDiv) + 1U);
+    }
+    else
+    {
+        freq = CLOCK_GetOscFreq() / (CLOCK_GetDiv(kCLOCK_UartDiv) + 1U);
+    }
+
+    return freq;
+}
+
 int mcu_uart_setattr(const devfs_handle_t * handle, void * ctl){
-	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 	u32 o_flags;
 	u32 freq;
 
@@ -170,6 +188,7 @@ int mcu_uart_setattr(const devfs_handle_t * handle, void * ctl){
 		uart_config.enableRx = true;
 
 		//pin assignments
+#if 0 //FIXME: needs implemented on RT. Use BOARD_InitPins() from SDK for now.
 		if( mcu_set_pin_assignment(
 				 &(local->attr->pin_assignment),
 				 MCU_CONFIG_PIN_ASSIGNMENT(uart_config_t, handle),
@@ -177,6 +196,7 @@ int mcu_uart_setattr(const devfs_handle_t * handle, void * ctl){
 				 CORE_PERIPH_UART, port, 0, 0, 0) < 0 ){
 			return SYSFS_SET_RETURN(EINVAL);
 		}
+#endif
 
 		if( LPUART_Init(local->instance, &uart_config, BOARD_DebugConsoleSrcFreq()) != kStatus_Success ) {
 			return SYSFS_SET_RETURN(EIO);
@@ -205,8 +225,14 @@ static void exec_writecallback(uart_local_t * uart, u32 o_events){
 }
 
 int mcu_uart_setaction(const devfs_handle_t * handle, void * ctl){
-	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 	mcu_action_t * action = (mcu_action_t*)ctl;
+	const uint32_t rx_inten = (kLPUART_RxDataRegFullInterruptEnable | kLPUART_RxOverrunInterruptEnable |
+			kLPUART_NoiseErrorInterruptEnable | kLPUART_FramingErrorInterruptEnable |
+			kLPUART_ParityErrorInterruptEnable | kLPUART_RxFifoUnderflowInterruptEnable);
+	const uint32_t tx_inten = (kLPUART_TxDataRegEmptyInterruptEnable | kLPUART_TxFifoOverflowInterruptEnable);
+	uint32_t inten = 0; // OR'd _lpuart_interrupt_enable flags
+
 
 	if( action->handler.callback == 0 ){
 		//if there is an ongoing operation -- cancel it
@@ -220,16 +246,20 @@ int mcu_uart_setaction(const devfs_handle_t * handle, void * ctl){
 
 			exec_readcallback(local, MCU_EVENT_FLAG_CANCELED);
 			local->transfer_handler.read = NULL;
+
+			inten |= rx_inten;
 		}
 
 		if( action->o_events & MCU_EVENT_FLAG_WRITE_COMPLETE ){
 			LPUART_TransferAbortSend(local->instance, &local->hal_handle);
 			exec_writecallback(local, MCU_EVENT_FLAG_CANCELED);
 			local->transfer_handler.write = NULL;
+
+			inten |= tx_inten;
 		}
 
+		LPUART_DisableInterrupts(local->instance, inten);
 	} else {
-
 		if( cortexm_validate_callback(action->handler.callback) < 0 ){
 			return SYSFS_SET_RETURN(EPERM);
 		}
@@ -243,11 +273,17 @@ int mcu_uart_setaction(const devfs_handle_t * handle, void * ctl){
 			if( LPUART_TransferReceiveNonBlocking(local->instance, &local->hal_handle, &local->incoming, NULL) != kStatus_Success ){
 				return SYSFS_SET_RETURN(EIO);
 			}
+
+			inten |= rx_inten;
 		}
 
 		if ( action->o_events & MCU_EVENT_FLAG_WRITE_COMPLETE ){
 			local->transfer_handler.write->handler = action->handler;
+
+			inten |= tx_inten;
 		}
+
+		LPUART_EnableInterrupts(local->instance, inten);
 	}
 
 	cortexm_set_irq_priority(uart_irqs[port], action->prio, action->o_events);
@@ -255,7 +291,7 @@ int mcu_uart_setaction(const devfs_handle_t * handle, void * ctl){
 }
 
 int mcu_uart_put(const devfs_handle_t * handle, void * ctl){
-	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 	u8 c = (u32)ctl;
 
 	/* wait until there's room to write the data, since this call path has no async callback to use */
@@ -272,7 +308,7 @@ int mcu_uart_flush(const devfs_handle_t * handle, void * ctl){
 
 
 int mcu_uart_get(const devfs_handle_t * handle, void * ctl){
-	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 	u8 * dest = ctl;
 	if( dest == 0 ){ return SYSFS_SET_RETURN(EINVAL); }
 
@@ -289,7 +325,7 @@ int mcu_uart_getall(const devfs_handle_t * handle, void * ctl){
 }
 
 int mcu_uart_read(const devfs_handle_t * handle, devfs_async_t * async){
-	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 
 	DEVFS_DRIVER_IS_BUSY(local->transfer_handler.read, async);
 
@@ -330,7 +366,7 @@ int mcu_uart_read(const devfs_handle_t * handle, devfs_async_t * async){
 
 
 int mcu_uart_write(const devfs_handle_t * handle, devfs_async_t * async){
-	DRIVER_ASSIGN_LOCAL(uart, MCU_UART_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 
 	DEVFS_DRIVER_IS_BUSY(local->transfer_handler.write, async);
 
