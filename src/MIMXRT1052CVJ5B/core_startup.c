@@ -208,6 +208,8 @@ _DECLARE_ISR(reserved173); //157
 _DECLARE_ISR(sjc_arm_debug); //158
 _DECLARE_ISR(nmi_wakeup); //159
 
+/* hook for NXP's FlexSPI configuration */
+extern void * __Vectors __attribute__ ((alias ("mcu_core_vector_table")));
 
 void (* const mcu_core_vector_table[])() __attribute__ ((section(".startup"))) = {
 		// Core Level - CM3
