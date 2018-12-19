@@ -223,7 +223,7 @@ int mcu_tmr_setchannel(const devfs_handle_t * handle, void * ctl){
 		if ( chan >= NUM_ICS ){
 			return SYSFS_SET_RETURN(EINVAL);
 		}
-		GPT_SetInputCaptureValue(local->instance, chan, req->value);
+		//GPT_SetInputCaptureValue(local->instance, chan, req->value);
 	} else {
 		chan = req->loc;
 		if ( chan >= NUM_OCS ){

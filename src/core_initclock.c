@@ -31,7 +31,6 @@ int mcu_core_initclock(int div){
 	//configure the systick
 	cortexm_set_systick_reload(0x00ffffff);
 	cortexm_start_systick();
-	SystemCoreClock = mcu_board_config.core_cpu_freq;
 
 	return 0;
 }

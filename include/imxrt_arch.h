@@ -26,7 +26,7 @@
 #include <mcu/adc.h>
 #include <mcu/dac.h>
 
-#if defined __MIMXRT1052CVJ5B
+#if defined __imxrt1052
 #define CORE_M7 1
 #define ARM_MATH_CM7 1
 #if !defined MIMXRT1052CVJ5B
