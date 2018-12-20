@@ -147,8 +147,8 @@ _DECLARE_ISR(ccm_2); //96
 _DECLARE_ISR(gpc); //97
 _DECLARE_ISR(src); //98
 _DECLARE_ISR(reserved115); //99
-_DECLARE_ISR(gpt1); //100
-_DECLARE_ISR(gpt2); //101
+_DECLARE_ISR(tmr1); //100 - call these 'tmr' instead of 'gpt', so OS will use this for internal timers
+_DECLARE_ISR(tmr2); //101
 _DECLARE_ISR(pwm1_0); //102
 _DECLARE_ISR(pwm1_1); //103
 _DECLARE_ISR(pwm1_2); //104
@@ -180,10 +180,10 @@ _DECLARE_ISR(enc1); //129
 _DECLARE_ISR(enc2); //130
 _DECLARE_ISR(enc3); //131
 _DECLARE_ISR(enc4); //132
-_DECLARE_ISR(tmr1); //133
-_DECLARE_ISR(tmr2); //134
-_DECLARE_ISR(tmr3); //135
-_DECLARE_ISR(tmr4); //136
+_DECLARE_ISR(qtmr1); //133
+_DECLARE_ISR(qtmr2); //134
+_DECLARE_ISR(qtmr3); //135
+_DECLARE_ISR(qtmr4); //136
 _DECLARE_ISR(pwm2_0); //137
 _DECLARE_ISR(pwm2_1); //138
 _DECLARE_ISR(pwm2_2); //139
@@ -331,8 +331,8 @@ void (* const mcu_core_vector_table[])() __attribute__ ((section(".startup"))) =
 		_ISR(gpc), //97
 		_ISR(src), //98
 		_ISR(reserved115), //99
-		_ISR(gpt1), //100
-		_ISR(gpt2), //101
+		_ISR(tmr1), //100 - call these 'tmr' instead of 'gpt', so OS will use this for internal timers
+		_ISR(tmr2), //101
 		_ISR(pwm1_0), //102
 		_ISR(pwm1_1), //103
 		_ISR(pwm1_2), //104
@@ -364,10 +364,10 @@ void (* const mcu_core_vector_table[])() __attribute__ ((section(".startup"))) =
 		_ISR(enc2), //130
 		_ISR(enc3), //131
 		_ISR(enc4), //132
-		_ISR(tmr1), //133
-		_ISR(tmr2), //134
-		_ISR(tmr3), //135
-		_ISR(tmr4), //136
+		_ISR(qtmr1), //133
+		_ISR(qtmr2), //134
+		_ISR(qtmr3), //135
+		_ISR(qtmr4), //136
 		_ISR(pwm2_0), //137
 		_ISR(pwm2_1), //138
 		_ISR(pwm2_2), //139
