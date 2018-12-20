@@ -2,9 +2,9 @@
 
   .text : {
          _text = .;
-         KEEP(*(.startup))
-         KEEP(*(.reset_vector))
-         KEEP(*(.isr_vector))
+  		 KEEP(*(.startup))
+  		 KEEP(*(.reset_vector))
+  		 KEEP(*(.isr_vector))
          *(.text)
          *(.init)
          *(.fini)
@@ -22,24 +22,24 @@
          *(.glue_7)
          *(.glue_7t)
 
-         *(.text.*)
+       	 *(.text.*)
          _priv_code = .;
          *(.priv_code)
          _priv_exec_code = .;
          *(.priv_exec_code)
          _epriv_code = .;
   } >flash
-
-
-  .ARM.extab :
+         
+         
+  .ARM.extab : 
   {
     *(.ARM.extab* .gnu.linkonce.armextab.*)
   } > flash
   __exidx_start = .;
-  .ARM.exidx   : {
-    *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+  .ARM.exidx   : { 
+    *(.ARM.exidx* .gnu.linkonce.armexidx.*) 
   } >flash
-
+  
   . = ALIGN(4);
   __exidx_end = .;
   _etext = .;
@@ -50,19 +50,14 @@
          } >ram AT>flash
   _edata = .;
   .bss : {
-         _bss = .;
+    	_bss = .;
          *(.bss)
          *(.bss.*)
          } >ram
   . = ALIGN(4);
   _ebss = .;
 
-/*
- * Needed for apps ...
-PROVIDE ( _text_size = (_etext - _text) );
-PROVIDE ( _data_size = (_edata - _data) );
-PROVIDE ( _ctors_size = ((_dtors - _ctors)>>2) );
-PROVIDE ( _dtors_size = ((_dtors_end - _dtors)>>2) );
-*/
+
+
 
 

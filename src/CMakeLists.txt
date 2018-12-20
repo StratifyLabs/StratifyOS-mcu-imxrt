@@ -16,6 +16,7 @@ set(SOURCES
 	${SOURCES_PREFIX}/tmr_dev.c
 	${SOURCES_PREFIX}/uart_dev.c
 	${SOURCES_PREFIX}/wdt.c
+	${SOURCES_PREFIX}/usb_dev.c
 	${SOURCES_PREFIX}/imxrt_local.h
 	${SOURCES_PREFIX}/imxrt_pin_local.h
 	${SOURCES_PREFIX}/imxrt_flash.c
