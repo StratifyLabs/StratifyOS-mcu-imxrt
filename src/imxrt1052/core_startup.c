@@ -30,7 +30,7 @@ const bootloader_api_t mcu_core_bootloader_api = {
 };
 
 void mcu_core_default_isr();
-void mcu_core_hardware_id() MCU_ALIAS(mcu_core_default_isr);
+void mcu_core_hardware_id() MCU_WEAK;
 
 void mcu_core_reset_handler() __attribute__ ((section(".reset_vector")));
 void mcu_core_nmi_isr() MCU_WEAK;
@@ -41,7 +41,7 @@ void mcu_core_busfault_handler();
 void mcu_core_usagefault_handler();
 
 void mcu_core_svcall_handler();
-void mcu_core_debugmon_handler() MCU_ALIAS(mcu_core_default_isr);
+void mcu_core_debugmon_handler() MCU_WEAK;
 void mcu_core_pendsv_handler();
 void mcu_core_systick_handler();
 
@@ -401,6 +401,14 @@ void mcu_core_reset_handler(){
 	while(1){
 		;
 	}
+}
+
+void mcu_core_hardware_id(){
+	mcu_board_execute_event_handler(MCU_BOARD_CONFIG_EVENT_ROOT_FATAL, "hwid");
+}
+
+void mcu_core_debugmon_handler(){
+	mcu_board_execute_event_handler(MCU_BOARD_CONFIG_EVENT_ROOT_FATAL, "dbgmon");
 }
 
 void mcu_core_default_isr(){
