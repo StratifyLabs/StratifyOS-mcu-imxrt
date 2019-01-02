@@ -4,11 +4,11 @@ flash_page_count = 1;
 
 MEMORY
 {
-  flash (rx) : ORIGIN = 0x60000000, LENGTH = 0x4000000 /* 64M bytes (alias Flash) */
-  sysmem (rwx) : ORIGIN = 0x20000000, LENGTH = 0x20000 /* 128K bytes (alias RAM) */
-  ram (rwx) : ORIGIN = 0x0, LENGTH = 0x20000 /* 128K bytes (alias RAM2) */
-  ram1 (rwx) : ORIGIN = 0x20200000, LENGTH = 0x40000 /* 256K bytes (alias RAM3) */
-  ram2 (rwx) : ORIGIN = 0x80000000, LENGTH = 0x2000000 /* 32M bytes (alias RAM4) */
+  flash (rx) : ORIGIN = 0x60000000, LENGTH = 0x4000000 /* 64M bytes (HyperFlash) */
+  ram (rwx) : ORIGIN = 0x20000000, LENGTH = 0x20000 /* 128K bytes (DTCM) */
+  ram1 (rwx) : ORIGIN = 0x0, LENGTH = 0x20000 /* 128K bytes (ITCM) */
+  sysmem (rwx) : ORIGIN = 0x20200000, LENGTH = 0x40000 /* 256K bytes (OCRAM) */
+  ram2 (rwx) : ORIGIN = 0x80000000, LENGTH = 0x2000000 /* 32M bytes (SDRAM) */
 }
 
 SECTIONS
@@ -25,7 +25,7 @@ SECTIONS
         . = 0x1030 ;
         KEEP(*(.boot_hdr.dcd_data))
         __boot_hdr_end__ = ABSOLUTE(.) ;
-        . = 0x2000 ;
+        . = 0x40000 ; /* MPU boundary alignment */
     } >flash
 }
 

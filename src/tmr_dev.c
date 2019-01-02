@@ -46,13 +46,16 @@ enum {
 static GPT_Type * const tmr_regs_table[NUM_TMRS] = MCU_TMR_REGS;
 static u8 const tmr_irqs[MCU_TMR_PORTS] = MCU_TMR_IRQS;
 
-
+typedef enum {
+	TIMER_FLAG_NONE = 0,
+	TIMER_FLAG_MAP_ROLLOVER_TO_MATCH, // only valid on first channel
+} timer_flag_e;
 
 typedef struct MCU_PACK {
 	GPT_Type * instance;
-	//TIM_HandleTypeDef hal_handle; //must be first
 	mcu_event_handler_t handler[NUM_OCS+NUM_ICS]; // Out1, Out2, Out3, In1, In2
 	mcu_event_handler_t period_handler;
+	timer_flag_e flags;
 	u8 ref_count;
 } tmr_local_t;
 
@@ -147,13 +150,16 @@ int mcu_tmr_setattr(const devfs_handle_t * handle, void * ctl){
 		return -1;
 	}
 
+	if (attr->channel.loc >= NUM_OCS) {
+		return -1;
+	}
+
 	u32 o_flags = attr->o_flags;
 	u32 freq = attr->freq;
 
 	if( o_flags & TMR_FLAG_SET_TIMER ){
 
 		if( (o_flags & (TMR_FLAG_IS_SOURCE_CPU|TMR_FLAG_IS_SOURCE_IC0|TMR_FLAG_IS_SOURCE_IC1)) ){
-			gpt_interrupt_enable_t inten = kGPT_InputCapture1InterruptEnable;
 
 			if( o_flags & TMR_FLAG_IS_SOURCE_CPU ){
 				if( attr->freq == 0 ){
@@ -170,7 +176,12 @@ int mcu_tmr_setattr(const devfs_handle_t * handle, void * ctl){
 			GPT_GetDefaultConfig(&config);
 
 			if( o_flags & TMR_FLAG_IS_AUTO_RELOAD ){
-				config.enableFreeRun = false;
+				if (attr->channel.loc == 0) {
+					config.enableFreeRun = false; // only supported on channel '1'
+					local->flags |= TIMER_FLAG_MAP_ROLLOVER_TO_MATCH;
+				} else {
+					return -1;
+				}
 			}
 
 			GPT_Init(local->instance, &config);
@@ -180,14 +191,16 @@ int mcu_tmr_setattr(const devfs_handle_t * handle, void * ctl){
 			uint32_t div = (uint32_t)((float)(sourceclk_freq / freq) / UINT32_MAX);
 			div = MIN(div, 4096);
 			div = MAX(div, 1);
+#ifdef ___debug
+			div = 100; // slow down timer when connected to debug interface
+#endif
 			GPT_SetClockDivider(local->instance, div);
 
 			if( o_flags & TMR_FLAG_IS_SOURCE_CPU ){
-				gpt_output_compare_channel_t output = kGPT_OutputCompare_Channel1; //FIXME: mapped based on attr->channel?
+				gpt_output_compare_channel_t output = _map_outputchannel((u8)attr->channel.loc);
 				uint32_t compval = sourceclk_freq / freq;
 				GPT_SetOutputCompareValue(local->instance, output, compval);
 
-				inten = kGPT_OutputCompare1InterruptEnable;
 			} else {
 				gpt_input_operation_mode_t mode = kGPT_InputOperation_RiseEdge;
 				if( o_flags & TMR_FLAG_IS_SOURCE_EDGEFALLING ){
@@ -199,13 +212,11 @@ int mcu_tmr_setattr(const devfs_handle_t * handle, void * ctl){
 				gpt_input_capture_channel_t input = kGPT_InputCapture_Channel1;
 				if( o_flags & TMR_FLAG_IS_SOURCE_IC1 ){
 					input = kGPT_InputCapture_Channel2;
-					inten = kGPT_InputCapture2InterruptEnable;
 				}
 
 				GPT_SetInputOperationMode(local->instance, input, mode);
 			}
 
-			GPT_EnableInterrupts(local->instance, inten);
 		} else {
 			return SYSFS_SET_RETURN(EINVAL);
 		}
@@ -316,6 +327,10 @@ int mcu_tmr_setaction(const devfs_handle_t * handle, void * ctl){
 
 	o_events = action->o_events;
 	chan = action->channel & ~MCU_CHANNEL_FLAG_IS_INPUT;
+
+	if (local->flags & TIMER_FLAG_MAP_ROLLOVER_TO_MATCH && o_events & MCU_EVENT_FLAG_OVERFLOW) {
+		o_events = MCU_EVENT_FLAG_MATCH; // match doesn't not trigger overflow interrupt on i.MX
+	}
 
 	handler_idx = chan;
 	if( action->channel & MCU_CHANNEL_FLAG_IS_INPUT ){
