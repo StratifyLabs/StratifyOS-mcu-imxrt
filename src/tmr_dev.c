@@ -29,11 +29,6 @@
 #define NUM_OCS 3
 #define NUM_ICS 2
 
-#define DRIVER_ASSIGN_LOCAL(object, port_count) \
-	const u32 port = handle->port; \
-	if( port >= port_count ){ return SYSFS_SET_RETURN(EBUSY); } \
-	object##_local_t * local = m_##object##_local + handle->port
-
 enum {
 	CHANNEL_TYPE_NONE,
 	CHANNEL_TYPE_OUTPUT_COMPARE,
@@ -72,7 +67,7 @@ void clear_actions(int port){
 DEVFS_MCU_DRIVER_IOCTL_FUNCTION(tmr, TMR_VERSION, TMR_IOC_IDENT_CHAR, I_MCU_TOTAL + I_TMR_TOTAL, mcu_tmr_setchannel, mcu_tmr_getchannel, mcu_tmr_set, mcu_tmr_get, mcu_tmr_enable, mcu_tmr_disable)
 
 int mcu_tmr_open(const devfs_handle_t * handle){
-	DRIVER_ASSIGN_LOCAL(tmr, MCU_TMR_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(tmr, MCU_TMR_PORTS);
 	if ( local->ref_count == 0 ){
 		clear_actions(port);
 		local->instance = tmr_regs_table[port];
@@ -87,7 +82,7 @@ int mcu_tmr_open(const devfs_handle_t * handle){
 
 
 int mcu_tmr_close(const devfs_handle_t * handle){
-	DRIVER_ASSIGN_LOCAL(tmr, MCU_TMR_PORTS);
+	DEVFS_DRIVER_DECLARE_LOCAL(tmr, MCU_TMR_PORTS);
 	if ( m_tmr_local[port].ref_count > 0 ){
 		if ( m_tmr_local[port].ref_count == 1 ){
 			clear_actions(port);
