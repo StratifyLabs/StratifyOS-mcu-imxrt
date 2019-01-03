@@ -39,5 +39,20 @@ int mpu_dev_init(){
 	}
 
 
+	/* make SEMC (i.e. external SDRAM, etc.) shared */
+	err = mpu_enable_region(
+				4,
+				(void*)0x80000000,  //SEMC
+				0x90000000 - 0x80000000, //NOTE: only 256MB of 1.5GB space is opened
+				MPU_ACCESS_PRW_URW,
+				MPU_MEMORY_PERIPHERALS,
+				false
+				);
+
+	if ( err < 0 ){
+		return err;
+	}
+
+
 	return 0;
 }
