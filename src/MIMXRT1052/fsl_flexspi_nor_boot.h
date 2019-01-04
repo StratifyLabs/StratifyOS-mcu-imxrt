@@ -35,7 +35,6 @@
 #define __FLEXSPI_NOR_BOOT_H__
 
 #include <stdint.h>
-#include "board.h"
 
 /************************************* 
  *  IVT Data 
@@ -120,7 +119,7 @@ typedef struct _boot_data_ {
   uint32_t placeholder;		/* placehoder to make even 0x10 size */
 }BOOT_DATA_T;
 
-#define FLASH_SIZE            BOARD_FLASH_SIZE
+#define FLASH_SIZE            0x4000000 //(hyperflash_config.memConfig.sflashA1Size / 8)
 #define PLUGIN_FLAG           (uint32_t)0
 
 /* External Variables */
