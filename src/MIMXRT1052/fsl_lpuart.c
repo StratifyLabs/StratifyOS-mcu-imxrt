@@ -1087,13 +1087,19 @@ void LPUART_TransferHandleIRQ(LPUART_Type *base, lpuart_handle_t *handle)
         /* Clear IDLE flag.*/
         base->STAT |= LPUART_STAT_IDLE_MASK;
 
+#if !defined(__StratifyOS__) // allow async rx on StratifyOS
         /* If rxDataSize is 0, disable idle line interrupt.*/
         if (!(handle->rxDataSize))
         {
             LPUART_DisableInterrupts(base, kLPUART_IdleLineInterruptEnable);
         }
+#endif
         /* If callback is not NULL and rxDataSize is not 0. */
-        if ((handle->callback) && (handle->rxDataSize))
+        if ((handle->callback)
+#if !defined(__StratifyOS__) // allow async rx on StratifyOS
+						&& (handle->rxDataSize)
+#endif
+						)
         {
             handle->callback(base, handle, kStatus_LPUART_IdleLineDetected, handle->userData);
         }
