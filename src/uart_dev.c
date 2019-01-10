@@ -66,7 +66,9 @@ static void lpuart_xfer_callback(LPUART_Type *instance, lpuart_handle_t *handle,
 		}
 	}
 
-	if (kStatus_LPUART_RxIdle == status || kStatus_LPUART_IdleLineDetected == status)
+	if (kStatus_LPUART_RxIdle == status || // dataSize met
+			kStatus_LPUART_RxRingBufferOverrun == status || // async rx filled ring buffer
+			kStatus_LPUART_IdleLineDetected == status) // async rx likely complete
 	{
 		ret = devfs_execute_event_handler(&uart->read_handler, MCU_EVENT_FLAG_DATA_READY, NULL);
 
@@ -75,7 +77,7 @@ static void lpuart_xfer_callback(LPUART_Type *instance, lpuart_handle_t *handle,
 		}
 	}
 
-	if (kStatus_LPUART_RxHardwareOverrun == status || kStatus_LPUART_RxRingBufferOverrun == status)
+	if (kStatus_LPUART_RxHardwareOverrun == status)
 	{
 		// callback not expecting this: devfs_execute_event_handler(&uart->read_handler, MCU_EVENT_FLAG_OVERFLOW, NULL);
 		mcu_debug_log_error(MCU_DEBUG_SYS, "%d - uart overflow", (LPUART_GetInstance(uart->instance) - 1));
@@ -239,7 +241,7 @@ int mcu_uart_setaction(const devfs_handle_t * handle, void * ctl){
 	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 	mcu_action_t * action = (mcu_action_t*)ctl;
 	const enum _lpuart_interrupt_enable rx_inten = (kLPUART_RxDataRegFullInterruptEnable |
-			kLPUART_IdleLineInterruptEnable | kLPUART_RxOverrunInterruptEnable |
+			kLPUART_RxOverrunInterruptEnable |
 			kLPUART_NoiseErrorInterruptEnable | kLPUART_FramingErrorInterruptEnable |
 			kLPUART_ParityErrorInterruptEnable | kLPUART_RxFifoUnderflowInterruptEnable);
 	const enum _lpuart_interrupt_enable tx_inten = (kLPUART_TxDataRegEmptyInterruptEnable |

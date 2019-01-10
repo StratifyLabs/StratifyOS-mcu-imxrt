@@ -371,7 +371,11 @@ status_t LPUART_Init(LPUART_Type *base, const lpuart_config_t *config, uint32_t 
     base->WATER = (((uint32_t)(config->rxFifoWatermark) << 16) | config->txFifoWatermark);
 
     /* Enable tx/rx FIFO */
-    base->FIFO |= (LPUART_FIFO_TXFE_MASK | LPUART_FIFO_RXFE_MASK);
+    base->FIFO |= (LPUART_FIFO_TXFE_MASK | LPUART_FIFO_RXFE_MASK
+#if defined(__StratifyOS__) // move async rx into ring buffer on StratifyOS
+        | LPUART_FIFO_RXIDEN(1)
+#endif
+        );
 
     /* Flush FIFO */
     base->FIFO |= (LPUART_FIFO_TXFLUSH_MASK | LPUART_FIFO_RXFLUSH_MASK);
@@ -1087,19 +1091,13 @@ void LPUART_TransferHandleIRQ(LPUART_Type *base, lpuart_handle_t *handle)
         /* Clear IDLE flag.*/
         base->STAT |= LPUART_STAT_IDLE_MASK;
 
-#if !defined(__StratifyOS__) // allow async rx on StratifyOS
         /* If rxDataSize is 0, disable idle line interrupt.*/
         if (!(handle->rxDataSize))
         {
             LPUART_DisableInterrupts(base, kLPUART_IdleLineInterruptEnable);
         }
-#endif
         /* If callback is not NULL and rxDataSize is not 0. */
-        if ((handle->callback)
-#if !defined(__StratifyOS__) // allow async rx on StratifyOS
-						&& (handle->rxDataSize)
-#endif
-						)
+        if ((handle->callback) && (handle->rxDataSize))
         {
             handle->callback(base, handle, kStatus_LPUART_IdleLineDetected, handle->userData);
         }
@@ -1144,6 +1142,9 @@ void LPUART_TransferHandleIRQ(LPUART_Type *base, lpuart_handle_t *handle)
         /* If use RX ring buffer, receive data to ring buffer. */
         if (handle->rxRingBuffer)
         {
+#if defined(__StratifyOS__) // allow async rx on StratifyOS
+            int rxcount = 0;
+#endif
             while (count--)
             {
                 /* If RX ring buffer is full, trigger callback to notify over run. */
@@ -1192,7 +1193,16 @@ void LPUART_TransferHandleIRQ(LPUART_Type *base, lpuart_handle_t *handle)
                 {
                     handle->rxRingBufferHead++;
                 }
+#if defined(__StratifyOS__) // allow async rx on StratifyOS
+                rxcount++;
+#endif
             }
+
+#if defined(__StratifyOS__) // allow async rx on StratifyOS
+            if (rxcount > 0 && handle->callback) {
+                handle->callback(base, handle, kStatus_LPUART_IdleLineDetected, handle->userData);
+            }
+#endif
         }
         /* If no receive requst pending, stop RX interrupt. */
         else if (!handle->rxDataSize)
