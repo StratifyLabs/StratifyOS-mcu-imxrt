@@ -28,7 +28,7 @@ include(${CMAKE_SOURCE_DIR}/mimxrt1052.cmake)
 endif()
 
 
-file(GLOB MIMXRT1052_HEADERS ${CMAKE_SOURCE_DIR}/src/mimxrt1052/*.h)
+file(GLOB MIMXRT1052_HEADERS ${CMAKE_SOURCE_DIR}/src/MIMXRT1052/*.h)
 
 install(FILES ${MIMXRT1052_HEADERS} DESTINATION include/mcu/arch/imxrt/mimxrt1052)
 
