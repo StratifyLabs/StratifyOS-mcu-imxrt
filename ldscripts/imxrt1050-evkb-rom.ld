@@ -29,7 +29,7 @@ SECTIONS
     } >flash
 }
 
-INCLUDE ldscript/imxrt105x.ld
+INCLUDE ldscripts/imxrt105x.ld
 
 PROVIDE ( _unique_id = 0x1FF07A10 );
 

@@ -9,7 +9,7 @@ SECTIONS {
 	_esys = .;
 
 	. = 0;
-	INCLUDE ldscript/imxrt-common.ld
+	INCLUDE ldscripts/imxrt-common.ld
 }
 
 PROVIDE ( _end = . );

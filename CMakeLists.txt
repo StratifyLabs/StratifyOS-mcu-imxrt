@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 3.6)
 #Add sources to the project
 set(SOURCES_PREFIX ${CMAKE_SOURCE_DIR}/src)
 add_subdirectory(src)
-file(GLOB LDSCRIPT_SOURCES "${CMAKE_SOURCE_DIR}/ldscript/*")
+file(GLOB LDSCRIPT_SOURCES "${CMAKE_SOURCE_DIR}/ldscripts/*")
 set(SHARED_SOURCELIST ${SOURCES} ${LDSCRIPT_SOURCES} ${CMAKE_SOURCE_DIR}/include/imxrt_arch.h ${CMAKE_SOURCE_DIR}/README.md)
 
 if( ${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Darwin" )
@@ -33,4 +33,4 @@ file(GLOB MIMXRT1052_HEADERS ${CMAKE_SOURCE_DIR}/src/MIMXRT1052/*.h)
 install(FILES ${MIMXRT1052_HEADERS} DESTINATION include/mcu/arch/imxrt/mimxrt1052)
 
 install(DIRECTORY include/ DESTINATION include/mcu/arch/imxrt)
-install(DIRECTORY ldscript/ DESTINATION lib/ldscripts)
+install(DIRECTORY ldscripts/ DESTINATION lib/ldscripts)
