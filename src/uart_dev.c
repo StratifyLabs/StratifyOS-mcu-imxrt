@@ -55,7 +55,7 @@ DEVFS_MCU_DRIVER_IOCTL_FUNCTION(uart, UART_VERSION, UART_IOC_IDENT_CHAR, I_MCU_T
 
 static void lpuart_xfer_callback(LPUART_Type *instance, lpuart_handle_t *handle, status_t status, void *userData){
 	uart_local_t *uart = userData;
-	int ret = 1;
+	int ret;
 
 	if (kStatus_LPUART_TxIdle == status)
 	{
