@@ -305,8 +305,16 @@ int mcu_uart_put(const devfs_handle_t * handle, void * ctl){
 }
 
 int mcu_uart_flush(const devfs_handle_t * handle, void * ctl){
-	char c;
-	mcu_uart_get(handle, &c);
+	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
+	char tmp;
+
+	//set Tail to Head and clear the fifo by reading out data (setting FIFO->RXFLUSH requires disabling rx and tx)
+	local->hal_handle.rxRingBufferHead = local->hal_handle.rxRingBufferTail = 0;
+	while ((LPUART_STAT_RDRF_MASK & local->instance->STAT) != 0) {
+		tmp = local->instance->DATA;
+	}
+	//TODO: clear overflow or idle here?
+
 	return 0;
 }
 

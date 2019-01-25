@@ -41,7 +41,7 @@ int mcu_mem_close(const devfs_handle_t * handle){ return 0; }
 
 //this is used by appfs
 int mcu_mem_getsyspage(){
-	return 0; //system memory starts on the first page at SRAM_START
+	return SRAM_START;
 }
 
 
@@ -251,7 +251,7 @@ int get_ram_page_addr(int page){
 }
 
 int is_ram(int addr, int size){
-	if ( (addr >= SRAM_START) && ((addr + size) <= SRAM_END) ){
+	if ( (addr >= 0x80000000) || (addr < 0x60000000) ){
 		return 1;
 	}
 
