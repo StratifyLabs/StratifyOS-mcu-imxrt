@@ -33,7 +33,3 @@ INCLUDE ldscripts/imxrt105x.ld
 
 PROVIDE ( _unique_id = 0x401f4410 );
 
-/*
- * Needed for apps ...
-PROVIDE ( _app_ram_size = _sram2_size );
-*/
