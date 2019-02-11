@@ -38,6 +38,7 @@
 #include "MIMXRT1052/fsl_lpuart.h"
 #include "MIMXRT1052/fsl_gpt.h"
 #include "MIMXRT1052/fsl_gpio.h"
+#include "MIMXRT1052/fsl_semc.h"
 
 int hal_set_alternate_pin_function(mcu_pin_t pin, core_periph_t function, int periph_port, int mode, int speed, int pull);
 GPIO_Type * const hal_get_pio_regs(u8 port);

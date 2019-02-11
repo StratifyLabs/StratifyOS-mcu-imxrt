@@ -8,5 +8,5 @@ MEMORY {
 
 INCLUDE ldscripts/imxrt105x.ld
 
-PROVIDE ( _unique_id = 0x1FF07A10 );
+PROVIDE ( _unique_id = 0x401f4410 );
 
