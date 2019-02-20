@@ -83,16 +83,14 @@ int mcu_tmr_open(const devfs_handle_t * handle){
 
 int mcu_tmr_close(const devfs_handle_t * handle){
 	DEVFS_DRIVER_DECLARE_LOCAL(tmr, MCU_TMR_PORTS);
-	if ( m_tmr_local[port].ref_count > 0 ){
-		if ( m_tmr_local[port].ref_count == 1 ){
+	if ( local->ref_count > 0 ){
+		if ( local->ref_count == 1 ){
 			clear_actions(port);
 			local->instance = 0;
 			if( tmr_irqs[port] != (u8)-1 ){
 				cortexm_disable_irq(tmr_irqs[port]);
 			}
-
-
-			m_tmr_local[port].ref_count--;
+			local->ref_count--;
 		}
 	}
 	return 0;
