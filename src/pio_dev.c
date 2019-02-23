@@ -117,9 +117,11 @@ int mcu_pio_getinfo(const devfs_handle_t * handle, void * ctl){
 int mcu_pio_setattr(const devfs_handle_t * handle, void * ctl){
 	DEVFS_DRIVER_DECLARE_LOCAL(pio, MCU_PIO_PORTS);
 	pio_attr_t * attr;
-	GPIO_Type * regs = m_pio_regs_table[port];
 	attr = ctl;
 	gpio_pin_config_t pin_config;
+
+	pin_config.interruptMode = kGPIO_NoIntmode;
+	pin_config.outputLogic = 0;
 
 	for(u32 i=0; i < 32; i++){
 		if( attr->o_pinmask & (1<<i) ){
@@ -130,8 +132,13 @@ int mcu_pio_setattr(const devfs_handle_t * handle, void * ctl){
 			}
 
 			//pullup/down?
+
+			if( local->instance == 0 ){
+				local->instance = m_pio_regs_table[port];
+			}
+
 			pin_config.outputLogic = 0;
-			GPIO_PinInit(local->instance, i, &pin_config);
+			//GPIO_PinInit(local->instance, i, &pin_config);
 		}
 	}
 

@@ -39,6 +39,7 @@ void mcu_core_getserialno(mcu_sn_t * serial_number){
 
 
 void core_init(){
+
 	u32 *src, *dest;
 	src = &_etext; //point src to copy of data that is stored in flash
 	for(dest = &_data; dest < &_edata; ){ *dest++ = *src++; } //Copy from flash to RAM (data)
@@ -66,7 +67,6 @@ void core_init(){
 	__lock_init_recursive_global(__env_lock_object);
 
 	//This is the de facto MCU initialization -- turn off power to peripherals that must be "open()"ed.
-
 
 }
 

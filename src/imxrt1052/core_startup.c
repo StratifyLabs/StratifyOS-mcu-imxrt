@@ -225,7 +225,7 @@ void (* const mcu_core_vector_table[])() __attribute__ ((section(".startup"))) =
 		(void*)&mcu_core_bootloader_api,										// Reserved -- this is the kernel signature checksum value 0x24
 		0,										// Reserved
 		mcu_core_svcall_handler,					// SVCall handler
-		mcu_core_debugmon_handler,					// Debug monitor handler
+		0,					// Debug monitor handler
 		0,										// Reserved
 		mcu_core_pendsv_handler,					// The PendSV handler
 		mcu_core_systick_handler,					// The SysTick handler
