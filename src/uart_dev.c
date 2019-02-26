@@ -79,11 +79,7 @@ int mcu_uart_open(const devfs_handle_t * handle){
 	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 	if ( local->ref_count == 0 ){
 		local->instance = uart_regs_table[port];
-
-		LPUART_TransferCreateHandle(local->instance, &(local->hal_handle), lpuart_xfer_callback, local);
-		LPUART_TransferStartRingBuffer(local->instance, &(local->hal_handle), local->circularbuf, UART_CIRCULAR_BUF_SIZE);
-
-		cortexm_enable_irq(uart_irqs[port]);
+		//cortexm_enable_irq(uart_irqs[port]);
 
 	}
 	local->ref_count++;
@@ -215,6 +211,14 @@ int mcu_uart_setattr(const devfs_handle_t * handle, void * ctl){
 		if( LPUART_Init(local->instance, &uart_config, BOARD_DebugConsoleSrcFreq()) != kStatus_Success ) {
 			return SYSFS_SET_RETURN(EIO);
 		}
+
+		LPUART_EnableTx(local->instance, true);
+		LPUART_EnableRx(local->instance, true);
+
+		LPUART_TransferCreateHandle(local->instance, &(local->hal_handle), lpuart_xfer_callback, local);
+		LPUART_TransferStartRingBuffer(local->instance, &(local->hal_handle), local->circularbuf, UART_CIRCULAR_BUF_SIZE);
+
+
 	}
 
 	return 0;

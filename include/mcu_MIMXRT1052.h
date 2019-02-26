@@ -57,7 +57,7 @@
 #define MCU_TMR_REGS { GPT1, GPT2 }
 #define MCU_TMR_IRQS { GPT1_IRQn, GPT2_IRQn }
 
-#define MCU_PIO_PORTS 5
+#define MCU_PIO_PORTS 5 //0     1      2	    3		  4 in Stratify OS numbering
 #define MCU_PIO_REGS { GPIO1, GPIO2, GPIO3, GPIO4, GPIO5 }
 //#define MCU_PIO_IRQS GPIO_IRQS doesn't work as expected IRQs aren't associated with port
 
@@ -80,7 +80,7 @@
 #define DEV_USB_LOGICAL_ENDPOINT_COUNT 4
 
 #define MCU_LAST_IRQ NMI_WAKEUP_IRQn
-#define MCU_MIDDLE_IRQ_PRIORITY 8
+#define MCU_MIDDLE_IRQ_PRIORITY ((1<<__NVIC_PRIO_BITS)/2)
 
 
 #define MCU_RAM_PAGES 80

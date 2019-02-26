@@ -132,13 +132,12 @@ int mcu_pio_setattr(const devfs_handle_t * handle, void * ctl){
 			}
 
 			//pullup/down?
-
 			if( local->instance == 0 ){
 				local->instance = m_pio_regs_table[port];
 			}
 
 			pin_config.outputLogic = 0;
-			//GPIO_PinInit(local->instance, i, &pin_config);
+			GPIO_PinInit(local->instance, i, &pin_config);
 		}
 	}
 

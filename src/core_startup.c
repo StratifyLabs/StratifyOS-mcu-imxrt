@@ -67,7 +67,7 @@ void core_init(){
 	__lock_init_recursive_global(__env_lock_object);
 
 	//This is the de facto MCU initialization -- turn off power to peripherals that must be "open()"ed.
-
+	SystemInit();
 }
 
 
