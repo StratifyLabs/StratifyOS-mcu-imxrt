@@ -21,7 +21,7 @@ SECTIONS
 		. = 0x1030 ;
 		KEEP(*(.boot_hdr.dcd_data))
 		__boot_hdr_end__ = ABSOLUTE(.) ;
-		. = 0x2000 ;
+		. = 0x20000 ;
 	} >flash
 }
 
