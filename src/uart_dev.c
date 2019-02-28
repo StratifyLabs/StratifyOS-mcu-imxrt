@@ -31,7 +31,7 @@
 
 #if MCU_UART_PORTS > 0
 
-#define UART_CIRCULAR_BUF_SIZE 65
+#define UART_CIRCULAR_BUF_SIZE 129
 
 typedef struct {
 	lpuart_handle_t hal_handle;
@@ -52,11 +52,8 @@ DEVFS_MCU_DRIVER_IOCTL_FUNCTION(uart, UART_VERSION, UART_IOC_IDENT_CHAR, I_MCU_T
 static void lpuart_xfer_callback(LPUART_Type *instance, lpuart_handle_t *handle, status_t status, void *userData){
 	uart_local_t *uart = userData;
 
-	if (kStatus_LPUART_TxIdle == status)
-	{
-
+	if (kStatus_LPUART_TxIdle == status){
 		devfs_execute_write_handler(&uart->transfer_handler, 0, 0, MCU_EVENT_FLAG_WRITE_COMPLETE);
-
 	}
 
 	if (kStatus_LPUART_RxIdle == status || // dataSize met
@@ -79,8 +76,7 @@ int mcu_uart_open(const devfs_handle_t * handle){
 	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
 	if ( local->ref_count == 0 ){
 		local->instance = uart_regs_table[port];
-		//cortexm_enable_irq(uart_irqs[port]);
-
+		cortexm_enable_irq(uart_irqs[port]);
 	}
 	local->ref_count++;
 
@@ -294,12 +290,11 @@ int mcu_uart_put(const devfs_handle_t * handle, void * ctl){
 
 int mcu_uart_flush(const devfs_handle_t * handle, void * ctl){
 	DEVFS_DRIVER_DECLARE_LOCAL(uart, MCU_UART_PORTS);
-	char tmp;
 
 	//set Tail to Head and clear the fifo by reading out data (setting FIFO->RXFLUSH requires disabling rx and tx)
 	local->hal_handle.rxRingBufferHead = local->hal_handle.rxRingBufferTail = 0;
 	while ((LPUART_STAT_RDRF_MASK & local->instance->STAT) != 0) {
-		tmp = local->instance->DATA;
+		 local->instance->DATA;
 	}
 	//TODO: clear overflow or idle here?
 
@@ -369,7 +364,7 @@ int mcu_uart_read(const devfs_handle_t * handle, devfs_async_t * async){
 	//FIXME: behavior if (!(async->flags & O_NONBLOCK))??
 
 	/* see if there is a transfer in progress, i.e. read handler is already in place */
-	u32 count;
+	u32 count = 0;
 	status_t ret = LPUART_TransferGetReceiveCount(local->instance, &local->hal_handle, &count);
 	if( (ret == kStatus_Success) && (count > 0) ){
 		//data is ready right now copy it to async->buf, clear the transfer handler and return the number of bytes read
@@ -402,6 +397,7 @@ int mcu_uart_read(const devfs_handle_t * handle, devfs_async_t * async){
 
 	//make sure no one is trying to hack the callback
 	if( cortexm_validate_callback(async->handler.callback) < 0 ){
+		local->transfer_handler.read = 0;
 		return SYSFS_SET_RETURN(EPERM);
 	}
 
@@ -437,8 +433,6 @@ int mcu_uart_write(const devfs_handle_t * handle, devfs_async_t * async){
 
 	return SYSFS_SET_RETURN(EIO);
 }
-
-
 
 void mcu_uart_isr(int port){
 	uart_local_t * local = m_uart_local + port;
