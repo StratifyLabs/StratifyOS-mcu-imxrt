@@ -2,8 +2,8 @@ flash_page_count = 0;
 
 MEMORY {
 	flash (rx) : ORIGIN = 0x60000000, LENGTH = 0x4000000 /* 64M bytes (HyperFlash) */
-	ram (rwx) : ORIGIN = 0x20000000, LENGTH = 64K /* 256KB DTCM 192KB bytes for general RAM */
-	sysmem (rwx) : ORIGIN = ORIGIN(ram) + LENGTH(ram), LENGTH = 64K /* 64KB bytes (DTCM) for system memory */
+	sysmem (rwx) : ORIGIN = 0x20000000, LENGTH = 64K /* 64KB bytes (DTCM) for system memory */
+	ram (rwx) : ORIGIN = ORIGIN(sysmem) + LENGTH(sysmem), LENGTH = 64K /* 256KB DTCM 192KB bytes for general RAM */
 	ram1 (rwx) : ORIGIN = 0x20200000, LENGTH = 256K /* 256K bytes (OCRAM) */
 }
 

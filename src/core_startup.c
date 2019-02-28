@@ -37,14 +37,24 @@ void mcu_core_getserialno(mcu_sn_t * serial_number){
 	serial_number->sn[3] = 0;
 }
 
+static const flexram_allocate_ram_t flexram_config = {
+	.ocramBankNum = 4,
+	.dtcmBankNum = 4,
+	.itcmBankNum = 8
+};
+
 
 void core_init(){
-
 	u32 *src, *dest;
+	for(src = &_sys; src < &_esys; ) *src++ = 0; //Zero out sysmem
+
+	//FlexRAM needs to give 256KB to DTCM and 256KB to ITCM on startup
+	//this needs to happen before data and bss are zero'ed
+	FLEXRAM_AllocateRam((flexram_allocate_ram_t*)&flexram_config);
+
 	src = &_etext; //point src to copy of data that is stored in flash
 	for(dest = &_data; dest < &_edata; ){ *dest++ = *src++; } //Copy from flash to RAM (data)
 	for(src = &_bss; src < &_ebss; ) *src++ = 0; //Zero out BSS section
-	for(src = &_sys; src < &_esys; ) *src++ = 0; //Zero out sysmem
 
 	//Re-entrancy initialization
 	//If the program faults on the next line, make sure the etext and data are aligned properly in the linker script (4 byte boundary)
