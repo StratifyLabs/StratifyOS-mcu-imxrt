@@ -31,7 +31,7 @@
 
 #if MCU_UART_PORTS > 0
 
-#define UART_CIRCULAR_BUF_SIZE 129
+#define UART_CIRCULAR_BUF_SIZE 257
 
 typedef struct {
 	lpuart_handle_t hal_handle;

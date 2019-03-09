@@ -26,7 +26,6 @@ static const char sys_proc_name[] = "sys";
 
 
 void mcu_core_nmi_isr() MCU_WEAK;
-int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr) MCU_WEAK;
 
 
 void mcu_core_getserialno(mcu_sn_t * serial_number){
@@ -38,9 +37,9 @@ void mcu_core_getserialno(mcu_sn_t * serial_number){
 }
 
 static const flexram_allocate_ram_t flexram_config = {
-	.ocramBankNum = 4,
-	.dtcmBankNum = 4,
-	.itcmBankNum = 8
+	.ocramBankNum = 4, //128K
+	.dtcmBankNum = 4, //128K
+	.itcmBankNum = 8 //256K
 };
 
 
@@ -83,9 +82,4 @@ void core_init(){
 
 void mcu_core_nmi_isr(){
 	mcu_board_execute_event_handler(MCU_BOARD_CONFIG_EVENT_ROOT_FATAL, 0);
-}
-
-
-int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr){
-	return 0;
 }
