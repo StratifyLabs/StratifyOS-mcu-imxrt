@@ -204,7 +204,9 @@ int mcu_uart_setattr(const devfs_handle_t * handle, void * ctl){
 		}
 #endif
 
-		if( LPUART_Init(local->instance, &uart_config, BOARD_DebugConsoleSrcFreq()) != kStatus_Success ) {
+		int init_result;
+		init_result = LPUART_Init(local->instance, &uart_config, BOARD_DebugConsoleSrcFreq());
+		if( init_result != kStatus_Success ) {
 			return SYSFS_SET_RETURN(EIO);
 		}
 
@@ -213,8 +215,6 @@ int mcu_uart_setattr(const devfs_handle_t * handle, void * ctl){
 
 		LPUART_TransferCreateHandle(local->instance, &(local->hal_handle), lpuart_xfer_callback, local);
 		LPUART_TransferStartRingBuffer(local->instance, &(local->hal_handle), local->circularbuf, UART_CIRCULAR_BUF_SIZE);
-
-
 	}
 
 	return 0;

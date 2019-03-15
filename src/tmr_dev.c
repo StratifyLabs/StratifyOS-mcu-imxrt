@@ -86,6 +86,9 @@ int mcu_tmr_close(const devfs_handle_t * handle){
 	if ( local->ref_count > 0 ){
 		if ( local->ref_count == 1 ){
 			clear_actions(port);
+
+			GPT_Deinit(local->instance);
+
 			local->instance = 0;
 			if( tmr_irqs[port] != (u8)-1 ){
 				cortexm_disable_irq(tmr_irqs[port]);

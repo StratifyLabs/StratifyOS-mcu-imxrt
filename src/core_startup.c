@@ -36,20 +36,14 @@ void mcu_core_getserialno(mcu_sn_t * serial_number){
 	serial_number->sn[3] = 0;
 }
 
-static const flexram_allocate_ram_t flexram_config = {
-	.ocramBankNum = 4, //128K
-	.dtcmBankNum = 4, //128K
-	.itcmBankNum = 8 //256K
-};
-
 
 void core_init(){
 	u32 *src, *dest;
-	for(src = &_sys; src < &_esys; ) *src++ = 0; //Zero out sysmem
 
-	//FlexRAM needs to give 256KB to DTCM and 256KB to ITCM on startup
-	//this needs to happen before data and bss are zero'ed
-	FLEXRAM_AllocateRam((flexram_allocate_ram_t*)&flexram_config);
+	//cache will get enabled later
+	mcu_core_disable_cache();
+
+	for(src = &_sys; src < &_esys; ) *src++ = 0; //Zero out sysmem
 
 	src = &_etext; //point src to copy of data that is stored in flash
 	for(dest = &_data; dest < &_edata; ){ *dest++ = *src++; } //Copy from flash to RAM (data)
@@ -74,6 +68,7 @@ void core_init(){
 	__lock_init_recursive_global(__sfp_lock);
 	__lock_init_recursive_global(__sinit_lock);
 	__lock_init_recursive_global(__env_lock_object);
+
 
 	//This is the de facto MCU initialization -- turn off power to peripherals that must be "open()"ed.
 	SystemInit();

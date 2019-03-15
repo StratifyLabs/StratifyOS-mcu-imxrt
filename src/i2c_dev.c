@@ -236,7 +236,7 @@ int mcu_i2c_write(const devfs_handle_t * handle, devfs_async_t * async){
 	 *
 	 */
 
-	u8 pointer_size;
+	u8 pointer_size = 1;
 	if( local->o_flags & I2C_FLAG_PREPARE_PTR_DATA ){
 		//This means write the pointer register then the data
 		if( local->o_flags & I2C_FLAG_IS_PTR_16 ){
