@@ -1,20 +1,22 @@
 cmake_minimum_required (VERSION 3.6)
 
-#Add sources to the project
-set(SOURCES_PREFIX ${CMAKE_SOURCE_DIR}/src)
-add_subdirectory(src)
-file(GLOB LDSCRIPT_SOURCES "${CMAKE_SOURCE_DIR}/ldscripts/*")
-set(SHARED_SOURCELIST ${SOURCES} ${LDSCRIPT_SOURCES} ${CMAKE_SOURCE_DIR}/include/imxrt_arch.h ${CMAKE_SOURCE_DIR}/README.md)
-
 if( ${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Darwin" )
   set(SOS_TOOLCHAIN_CMAKE_PATH /Applications/StratifyLabs-SDK/Tools/gcc/arm-none-eabi/cmake)
 endif()
 if( ${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows" )
   set(SOS_TOOLCHAIN_CMAKE_PATH C:/StratifyLabs-SDK/Tools/gcc/arm-none-eabi/cmake)
 endif()
+
+include(${SOS_TOOLCHAIN_CMAKE_PATH}/sos-variables.cmake)
 set(CMAKE_TOOLCHAIN_FILE ${SOS_TOOLCHAIN_CMAKE_PATH}/sos-lib-toolchain.cmake)
 set(SOS_LIB_NAME sos)
 project(${SOS_LIB_NAME} C ASM)
+
+#Add sources to the project
+set(SOURCES_PREFIX ${CMAKE_SOURCE_DIR}/src)
+add_subdirectory(src)
+file(GLOB LDSCRIPT_SOURCES "${CMAKE_SOURCE_DIR}/ldscripts/*")
+set(SHARED_SOURCELIST ${SOURCES} ${LDSCRIPT_SOURCES} ${CMAKE_SOURCE_DIR}/include/imxrt_arch.h ${CMAKE_SOURCE_DIR}/README.md)
 
 option(BUILD_ALL "Build All configurations" ON)
 
