@@ -9,8 +9,8 @@ endif()
 
 include(${SOS_TOOLCHAIN_CMAKE_PATH}/sos-variables.cmake)
 set(CMAKE_TOOLCHAIN_FILE ${SOS_TOOLCHAIN_CMAKE_PATH}/sos-lib-toolchain.cmake)
-set(SOS_LIB_NAME sos)
-project(${SOS_LIB_NAME} C ASM)
+set(SOS_NAME sos)
+project(${SOS_NAME} C ASM)
 
 #Add sources to the project
 set(SOURCES_PREFIX ${CMAKE_SOURCE_DIR}/src)
