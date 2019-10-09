@@ -637,7 +637,7 @@ usb_status_t mcu_usb_device_endpoint_in_callback(usb_device_handle handle,
 
 	if( transfer->write ){
 		u32 o_flags;
-		mcu_debug_printf("-----USB Write Delay---------------\n");
+		//mcu_debug_printf("-----USB Write Delay---------------\n");
 
 		usb_event_t usb_event;
 		usb_event.epnum = transfer->write->loc | 0x80;

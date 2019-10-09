@@ -70,7 +70,7 @@ int spi_local_setattr(const devfs_handle_t * handle, void * ctl){
 
 	const spi_attr_t * attr = mcu_select_attr(handle, ctl);
 	if( attr == 0 ){
-		//neither application or BSP has supplied spi attributes
+		//neither appl´ication or BSP has supplied spi attributes
 		return SYSFS_SET_RETURN(EINVAL);
 	}
 
