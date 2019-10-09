@@ -162,7 +162,6 @@ int mcu_usb_setattr(const devfs_handle_t * handle, void * ctl){
 
 		USB_EhciPhyInit(kUSB_ControllerEhci0, attr->freq, &phyConfig);
 
-
 		local->read_ready = 0;
 
 		result = mcu_set_pin_assignment(
@@ -315,25 +314,32 @@ int mcu_usb_read(const devfs_handle_t * handle, devfs_async_t * async){
 
 	DEVFS_DRIVER_IS_BUSY(local->endpoint_handlers[loc].read, async);
 
-	//mcu_debug_printf("r:%d\n", async->nbyte);
-
 	//this version must always be allowed to block
 	if ( !(async->flags & O_NONBLOCK) ){
 		//check to see if endpoint is configured
 		usb_device_endpoint_status_struct_t endpoint_status;
 
 		endpoint_status.endpointAddress = loc;
-		if( USB_DeviceGetStatus(local->hal_handle, kUSB_DeviceStatusEndpoint, &endpoint_status) != kStatus_USB_Success ){
+		if( USB_DeviceGetStatus(
+				 local->hal_handle,
+				 kUSB_DeviceStatusEndpoint,
+				 &endpoint_status
+				 ) != kStatus_USB_Success
+			 ){
 			result = SYSFS_SET_RETURN(EIO);
 		} else {
-			if( endpoint_status.endpointStatus == kUSB_DeviceEndpointStateIdle && (local->read_ready & (1<<loc)) ){
+			if( endpoint_status.endpointStatus == kUSB_DeviceEndpointStateIdle &&
+				 (local->read_ready & (1<<loc))
+				 ){
 				//return success to indicate this is a blocking call
 				result = USB_DeviceRecvRequest(local->hal_handle, loc, async->buf, async->nbyte); //next packet will be a setup packet
 				if( result != kStatus_USB_Success ){
-					result = SYSFS_SET_RETURN(EIO);
-				} else {
-					result = SYSFS_RETURN_SUCCESS;
+					//this means the USB cable has disconnected
+					//this will cause the caller to block until the cable is reconnected and data arrives
+					local->read_ready = 0;
 				}
+				result = SYSFS_RETURN_SUCCESS;
+
 			} else {
 				result = SYSFS_RETURN_SUCCESS;
 			}
@@ -364,8 +370,6 @@ int mcu_usb_write(const devfs_handle_t * handle, devfs_async_t * async){
 	}
 
 	DEVFS_DRIVER_IS_BUSY(local->endpoint_handlers[ep].write, async);
-
-	//mcu_debug_printf("**************** w:%d *********************\n", async->nbyte);
 
 	bytes_written = mcu_usb_root_write_endpoint(handle, loc, async->buf, async->nbyte);
 
@@ -400,7 +404,14 @@ void usb_configure(usb_device_handle hal_handle, u32 cfg){
 
 }
 
-void usb_configure_endpoint(const devfs_handle_t * handle, usb_device_handle hal_handle, u32 endpoint_num, u32 max_packet_size, u8 type){
+void usb_configure_endpoint(
+		const devfs_handle_t * handle,
+		usb_device_handle hal_handle,
+		u32 endpoint_num,
+		u32 max_packet_size,
+		u8 type
+		){
+
 	usb_device_endpoint_init_struct_t epInitStruct;
 	usb_device_endpoint_callback_struct_t epCallback;
 	u8 endpoint_offset = endpoint_num & 0x7f;
@@ -419,15 +430,24 @@ void usb_configure_endpoint(const devfs_handle_t * handle, usb_device_handle hal
 	usb_local_t * local = m_usb_local + handle->port;
 	epCallback.callbackParam = local->endpoint_handlers + endpoint_offset;
 
-
 	USB_DeviceInitEndpoint(hal_handle, &epInitStruct, &epCallback);
 
-	if(endpoint_offset == endpoint_num){
+	if( endpoint_offset == endpoint_num ){
 		local->read_ready |= (1<<endpoint_offset);
 		if( local->endpoint_handlers[endpoint_offset].read ){
 			devfs_async_t * async = local->endpoint_handlers[endpoint_offset].read;
-			if( USB_DeviceRecvRequest(local->hal_handle, async->loc, async->buf, async->nbyte) != kStatus_USB_Success ){
-				devfs_execute_read_handler(local->endpoint_handlers + endpoint_offset, 0, SYSFS_SET_RETURN(EIO), MCU_EVENT_FLAG_CANCELED | MCU_EVENT_FLAG_ERROR);
+			if( USB_DeviceRecvRequest(
+					 local->hal_handle,
+					 async->loc,
+					 async->buf,
+					 async->nbyte
+					 ) != kStatus_USB_Success ){
+				devfs_execute_read_handler(
+							local->endpoint_handlers + endpoint_offset,
+							0,
+							SYSFS_SET_RETURN(EIO),
+							MCU_EVENT_FLAG_CANCELED | MCU_EVENT_FLAG_ERROR
+							);
 			}
 		}
 	}
@@ -523,7 +543,11 @@ usb_local_t * local_from_handle(usb_device_handle hal_handle){
 }
 
 
-usb_status_t mcu_usb_device_callback(usb_device_handle handle, uint32_t event, void *eventParam){
+usb_status_t mcu_usb_device_callback(
+		usb_device_handle handle,
+		uint32_t event,
+		void *eventParam
+		){
 	u32 o_flags = 0;
 	usb_local_t * local = local_from_handle(handle);
 
@@ -537,6 +561,7 @@ usb_status_t mcu_usb_device_callback(usb_device_handle handle, uint32_t event, v
 			break;
 		case kUSB_DeviceEventSuspend:
 			o_flags = MCU_EVENT_FLAG_SUSPEND;
+
 			break;
 		case kUSB_DeviceEventResume:
 			o_flags = MCU_EVENT_FLAG_RESUME;
@@ -566,7 +591,6 @@ usb_status_t mcu_usb_control_out_endpoint_callback(usb_device_handle handle,
 
 	//execute the control handler
 	if( message->isSetup ){
-		//mcu_debug_printf("setup\n");
 		if( local->control_endpoint_buffer != message->buffer ){
 			local->control_endpoint_size = message->length > USB_CONTROL_MAX_PACKET_SIZE ? USB_CONTROL_MAX_PACKET_SIZE : message->length;
 			memcpy(local->control_endpoint_buffer, message->buffer, local->control_endpoint_size);
@@ -579,17 +603,24 @@ usb_status_t mcu_usb_control_out_endpoint_callback(usb_device_handle handle,
 
 		if( (setup->bmRequestType.bitmap_t.dir == USBD_REQUEST_TYPE_DIRECTION_HOST_TO_DEVICE) && (setup->wLength > 0) ){
 			//get ready to receive
-			//mcu_debug_printf("need to rx data\n");
-			USB_DeviceRecvRequest(local->hal_handle, 0, local->control_endpoint_buffer, setup->wLength);
+			USB_DeviceRecvRequest(
+						local->hal_handle,
+						0,
+						local->control_endpoint_buffer,
+						setup->wLength
+						);
 		}
 	} else {
-		//mcu_debug_printf("control out event %d\n", message->length);
 		if( message->length > 0 ){
 			local->control_endpoint_size = message->length;
 			if( local->control_endpoint_buffer != message->buffer ){
-				mcu_debug_printf("buffer mismatch\n");
+				mcu_debug_printf("buffer mismatch??\n");
 			}
-			mcu_execute_event_handler(&local->control_handler, MCU_EVENT_FLAG_DATA_READY, &usb_event);
+			mcu_execute_event_handler(
+						&local->control_handler,
+						MCU_EVENT_FLAG_DATA_READY,
+						&usb_event
+						);
 		}
 	}
 
@@ -604,8 +635,6 @@ usb_status_t mcu_usb_control_in_endpoint_callback(usb_device_handle handle,
 	usb_local_t * local = callbackParam;
 	usb_event_t usb_event;
 	usb_event.epnum = 0;
-
-	//mcu_debug_printf("control in %d\n", message->length);
 
 	mcu_execute_event_handler(&local->control_handler, MCU_EVENT_FLAG_WRITE_COMPLETE, &usb_event);
 
@@ -623,7 +652,6 @@ usb_status_t mcu_usb_control_in_endpoint_callback(usb_device_handle handle,
 		USB_DeviceGetStatus(handle, kUSB_DeviceStatusSpeed, &speed);
 
 	}
-	//mcu_debug_printf("-----CTRL--------------------\n");
 
 	return kStatus_USB_Success;
 }
@@ -637,7 +665,6 @@ usb_status_t mcu_usb_device_endpoint_in_callback(usb_device_handle handle,
 
 	if( transfer->write ){
 		u32 o_flags;
-		//mcu_debug_printf("-----USB Write Delay---------------\n");
 
 		usb_event_t usb_event;
 		usb_event.epnum = transfer->write->loc | 0x80;
@@ -649,23 +676,25 @@ usb_status_t mcu_usb_device_endpoint_in_callback(usb_device_handle handle,
 			transfer->write->nbyte = SYSFS_SET_RETURN(EIO);
 			o_flags = MCU_EVENT_FLAG_CANCELED | MCU_EVENT_FLAG_ERROR;
 		}
-		//mcu_debug_printf("wd0x%X:% d\n", usb_event.epnum, message->length);
+
 		if( message->buffer != transfer->write->buf ){
-			mcu_debug_printf("buffer mismatch\n");
+			mcu_debug_printf("buffer mismatch????\n");
 		}
 
 		devfs_execute_write_handler(transfer, &usb_event, 0, o_flags);
 
 	} else {
-		mcu_debug_printf("nothing to transfer\n");
+		mcu_debug_printf("nothing to transfer??\n");
 	}
 
 	return kStatus_USB_Success;
 }
 
-usb_status_t mcu_usb_device_endpoint_out_callback(usb_device_handle handle,
-																  usb_device_endpoint_callback_message_struct_t *message,
-																  void *callbackParam){
+usb_status_t mcu_usb_device_endpoint_out_callback(
+		usb_device_handle handle,
+		usb_device_endpoint_callback_message_struct_t *message,
+		void *callbackParam
+		){
 	devfs_transfer_handler_t * transfer = callbackParam;
 
 	//endpoint number?
@@ -683,7 +712,6 @@ usb_status_t mcu_usb_device_endpoint_out_callback(usb_device_handle handle,
 			o_flags = MCU_EVENT_FLAG_CANCELED | MCU_EVENT_FLAG_ERROR;
 		}
 
-		//mcu_debug_printf("rd:%d\n", message->length);
 		devfs_execute_read_handler(transfer, &usb_event, 0, o_flags);
 	}
 	return kStatus_USB_Success;
@@ -734,7 +762,6 @@ void mcu_core_usb_phy2_isr(){}
 
 void mcu_core_usb_otg1_isr(){
 	USB_DeviceEhciIsrFunction(m_usb_local[0].hal_handle);
-	//cortexm_delay_us(5000);
 }
 
 void mcu_core_usb_otg2_isr(){}
