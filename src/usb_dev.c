@@ -37,13 +37,13 @@
 
 #if MCU_USB_PORTS > 0
 
-typedef struct MCU_PACK {
+typedef struct {
 	usb_device_handle hal_handle;
 	u32 read_ready;
 	mcu_event_handler_t control_handler;
 	mcu_event_handler_t special_event_handler;
 	devfs_transfer_handler_t endpoint_handlers[DEV_USB_LOGICAL_ENDPOINT_COUNT];
-	u8 control_endpoint_buffer[USB_CONTROL_MAX_PACKET_SIZE];
+	u8 control_endpoint_buffer[USB_CONTROL_MAX_PACKET_SIZE] MCU_ALIGN(32);
 	u16 control_endpoint_size;
 	u16 is_connected;
 	u8 ref_count;
@@ -55,21 +55,25 @@ static usb_status_t USB_DeviceControlPipeInit(usb_device_handle handle, void *pa
 //driver callbacks
 static usb_status_t mcu_usb_device_callback(usb_device_handle handle, uint32_t event, void *eventParam);
 
-static usb_status_t mcu_usb_control_in_endpoint_callback(usb_device_handle handle,
-																			usb_device_endpoint_callback_message_struct_t *message,
-																			void *callbackParam);
+static usb_status_t mcu_usb_control_in_endpoint_callback(
+		usb_device_handle handle,
+		usb_device_endpoint_callback_message_struct_t *message,
+		void *callbackParam);
 
-static usb_status_t mcu_usb_control_out_endpoint_callback(usb_device_handle handle,
-																			 usb_device_endpoint_callback_message_struct_t *message,
-																			 void *callbackParam);
+static usb_status_t mcu_usb_control_out_endpoint_callback(
+		usb_device_handle handle,
+		usb_device_endpoint_callback_message_struct_t *message,
+		void *callbackParam);
 
-static usb_status_t mcu_usb_device_endpoint_in_callback(usb_device_handle handle,
-																		  usb_device_endpoint_callback_message_struct_t *message,
-																		  void *callbackParam);
+static usb_status_t mcu_usb_device_endpoint_in_callback(
+		usb_device_handle handle,
+		usb_device_endpoint_callback_message_struct_t *message,
+		void *callbackParam);
 
-static usb_status_t mcu_usb_device_endpoint_out_callback(usb_device_handle handle,
-																			usb_device_endpoint_callback_message_struct_t *message,
-																			void *callbackParam);
+static usb_status_t mcu_usb_device_endpoint_out_callback(
+		usb_device_handle handle,
+		usb_device_endpoint_callback_message_struct_t *message,
+		void *callbackParam);
 
 static void usb_connect(u32 port, u32 con);
 static void usb_configure(usb_device_handle hal_handle, u32 cfg);
@@ -371,8 +375,12 @@ int mcu_usb_write(const devfs_handle_t * handle, devfs_async_t * async){
 
 	DEVFS_DRIVER_IS_BUSY(local->endpoint_handlers[ep].write, async);
 
-	bytes_written = mcu_usb_root_write_endpoint(handle, loc, async->buf, async->nbyte);
-
+	bytes_written = mcu_usb_root_write_endpoint(
+				handle,
+				loc,
+				async->buf,
+				async->nbyte
+				);
 
 
 	if ( bytes_written < 0 ){
@@ -419,6 +427,7 @@ void usb_configure_endpoint(
 	epInitStruct.endpointAddress = endpoint_num;
 	epInitStruct.maxPacketSize = max_packet_size;
 	epInitStruct.transferType = type;
+	epInitStruct.interval = 1;
 
 	//USB_DeviceInitEndpoint
 	epInitStruct.zlt = 0;
@@ -428,14 +437,16 @@ void usb_configure_endpoint(
 		epCallback.callbackFn = mcu_usb_device_endpoint_out_callback;
 	}
 	usb_local_t * local = m_usb_local + handle->port;
-	epCallback.callbackParam = local->endpoint_handlers + endpoint_offset;
+	epCallback.callbackParam =
+			local->endpoint_handlers + endpoint_offset;
 
 	USB_DeviceInitEndpoint(hal_handle, &epInitStruct, &epCallback);
 
 	if( endpoint_offset == endpoint_num ){
 		local->read_ready |= (1<<endpoint_offset);
 		if( local->endpoint_handlers[endpoint_offset].read ){
-			devfs_async_t * async = local->endpoint_handlers[endpoint_offset].read;
+			devfs_async_t * async =
+					local->endpoint_handlers[endpoint_offset].read;
 			if( USB_DeviceRecvRequest(
 					 local->hal_handle,
 					 async->loc,
@@ -517,19 +528,53 @@ int mcu_usb_root_read_endpoint(const devfs_handle_t * handle, u32 endpoint_num, 
 
 }
 
-int mcu_usb_root_write_endpoint(const devfs_handle_t * handle, u32 endpoint_num, const void * src, u32 size){
+int mcu_usb_root_write_endpoint(
+		const devfs_handle_t * handle,
+		u32 endpoint_num,
+		const void * src,
+		u32 size
+		){
 	DEVFS_DRIVER_DECLARE_LOCAL(usb, MCU_USB_PORTS);
 	int result;
 
-	result = USB_DeviceSendRequest(local->hal_handle, endpoint_num, (void*)src, size);
+#if 0
+	mcu_core_clean_data_cache_block(
+				(void*)src,
+				size
+				);
+#endif
+
+	result = USB_DeviceSendRequest(
+				local->hal_handle,
+				endpoint_num,
+				(void*)src,
+				size
+				);
+
 	if( result == kStatus_USB_Success ){
-		if( ((endpoint_num & 0x7f) == 0) && (size != USB_CONTROL_MAX_PACKET_SIZE) && (size != 0)){
-			USB_DeviceRecvRequest(local->hal_handle, 0, 0, 0); //next packet will be a setup packet
+		if( ((endpoint_num & 0x7f) == 0) &&
+			 (size != USB_CONTROL_MAX_PACKET_SIZE) &&
+			 (size != 0)
+			 ){
+
+			//next packet will be a setup packet
+			USB_DeviceRecvRequest(
+						local->hal_handle,
+						0,
+						0,
+						0
+						);
 		}
 		return size;
 	}
 
-	mcu_debug_printf("failed to write %d to 0x%X - %d\n", size, endpoint_num, result);
+	mcu_debug_printf(
+				"failed to write %d to 0x%X - %d\n",
+				size,
+				endpoint_num,
+				result
+				);
+
 	return SYSFS_SET_RETURN(EIO);
 }
 
@@ -582,9 +627,11 @@ usb_status_t mcu_usb_device_callback(
 }
 
 //OUT or setup (data has arrived)
-usb_status_t mcu_usb_control_out_endpoint_callback(usb_device_handle handle,
-																	usb_device_endpoint_callback_message_struct_t *message,
-																	void *callbackParam){
+usb_status_t mcu_usb_control_out_endpoint_callback(
+		usb_device_handle handle,
+		usb_device_endpoint_callback_message_struct_t *message,
+		void *callbackParam
+		){
 	usb_local_t * local = callbackParam;
 	usb_event_t usb_event;
 	usb_event.epnum = 0;
@@ -629,9 +676,12 @@ usb_status_t mcu_usb_control_out_endpoint_callback(usb_device_handle handle,
 }
 
 //in to HOST from device
-usb_status_t mcu_usb_control_in_endpoint_callback(usb_device_handle handle,
-																  usb_device_endpoint_callback_message_struct_t *message,
-																  void *callbackParam){
+usb_status_t mcu_usb_control_in_endpoint_callback(
+		usb_device_handle handle,
+		usb_device_endpoint_callback_message_struct_t *message,
+		void *callbackParam
+		){
+
 	usb_local_t * local = callbackParam;
 	usb_event_t usb_event;
 	usb_event.epnum = 0;
@@ -656,9 +706,11 @@ usb_status_t mcu_usb_control_in_endpoint_callback(usb_device_handle handle,
 	return kStatus_USB_Success;
 }
 
-usb_status_t mcu_usb_device_endpoint_in_callback(usb_device_handle handle,
-																 usb_device_endpoint_callback_message_struct_t *message,
-																 void *callbackParam){
+usb_status_t mcu_usb_device_endpoint_in_callback(
+		usb_device_handle handle,
+		usb_device_endpoint_callback_message_struct_t *message,
+		void *callbackParam
+		){
 	devfs_transfer_handler_t * transfer = callbackParam;
 	//endpoint number?
 
@@ -681,7 +733,12 @@ usb_status_t mcu_usb_device_endpoint_in_callback(usb_device_handle handle,
 			mcu_debug_printf("buffer mismatch????\n");
 		}
 
-		devfs_execute_write_handler(transfer, &usb_event, 0, o_flags);
+		devfs_execute_write_handler(
+					transfer,
+					&usb_event,
+					0,
+					o_flags
+					);
 
 	} else {
 		mcu_debug_printf("nothing to transfer??\n");
@@ -711,6 +768,17 @@ usb_status_t mcu_usb_device_endpoint_out_callback(
 			transfer->read->nbyte = SYSFS_SET_RETURN(EIO);
 			o_flags = MCU_EVENT_FLAG_CANCELED | MCU_EVENT_FLAG_ERROR;
 		}
+
+		if( (u32)(transfer->read->buf) & 0x1f ){
+			mcu_debug_printf("not aligned\n");
+		}
+
+#if 0
+		mcu_core_invalidate_data_cache_block(
+					transfer->read->buf,
+					message->length
+					);
+#endif
 
 		devfs_execute_read_handler(transfer, &usb_event, 0, o_flags);
 	}
