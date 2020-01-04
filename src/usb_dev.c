@@ -306,7 +306,10 @@ int mcu_usb_setaction(const devfs_handle_t * handle, void * ctl){
 	return 0;
 }
 
-int mcu_usb_read(const devfs_handle_t * handle, devfs_async_t * async){
+int mcu_usb_read(
+		const devfs_handle_t * handle,
+		devfs_async_t * async
+		){
 	DEVFS_DRIVER_DECLARE_LOCAL(usb, MCU_USB_PORTS);
 
 	int result;
@@ -336,7 +339,11 @@ int mcu_usb_read(const devfs_handle_t * handle, devfs_async_t * async){
 				 (local->read_ready & (1<<loc))
 				 ){
 				//return success to indicate this is a blocking call
-				result = USB_DeviceRecvRequest(local->hal_handle, loc, async->buf, async->nbyte); //next packet will be a setup packet
+				result = USB_DeviceRecvRequest(
+							local->hal_handle,
+							loc, async->buf,
+							async->nbyte
+							); //next packet will be a setup packet
 				if( result != kStatus_USB_Success ){
 					//this means the USB cable has disconnected
 					//this will cause the caller to block until the cable is reconnected and data arrives
@@ -779,7 +786,6 @@ usb_status_t mcu_usb_device_endpoint_out_callback(
 					message->length
 					);
 #endif
-
 		devfs_execute_read_handler(transfer, &usb_event, 0, o_flags);
 	}
 	return kStatus_USB_Success;
