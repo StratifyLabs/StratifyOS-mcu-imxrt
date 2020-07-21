@@ -17,7 +17,6 @@
 
 //#include "config.h"
 
-#include <mcu/arch.h>
 #include <mcu/bootloader.h>
 #include "imxrt_flash.h"
 
